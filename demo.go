@@ -93,11 +93,48 @@ const abiJsonStr = `[
 
 func main() {
 	TestDeposit()
+	TestDepositAsyncWithTransaction()
 	TestQueryTransaction()
 	TestQueryReceipt()
 	TestDeployContractAndCallContract()
 	TestCreateAndQueryAccountWithKmsIdAndDeposit()
 	TestCreateAndQueryAccountWithKmsIdAndDeployCallContract()
+}
+
+func TestDepositAsyncWithTransaction() {
+	configFilePath := os.Getenv("GOPATH") + "/src/gitlab.alipay-inc.com/antchain/restclient-go-demo/rest-config.json"
+	restClient, err := client.NewRestClient(configFilePath)
+	if err != nil {
+		panic(fmt.Errorf("failed to NewRestClient err:%+v", err))
+	}
+	if restClient.RestToken == "" {
+		panic(fmt.Errorf("rest token:%+v is empty", restClient.RestToken))
+	}
+
+	bizid := restClient.RestClientProperties.BizId
+	u := uuid.New()
+	orderId := fmt.Sprintf("order_%v", u.String())
+	content := "我是中国人"
+	var gas int64 = 50000
+	baseResp, err := restClient.DepositAsyncWithTransaction(bizid, orderId, RestBizTestAccount, content, RestBizTestKmsID, gas)
+	if !(err == nil && baseResp.Code == "200") {
+		panic(fmt.Errorf("no succ resp baseResp:%+v err:%+v", baseResp, err))
+	}
+	jsonObject := make(map[string]interface{})
+	err = json.Unmarshal([]byte(baseResp.Data), &jsonObject)
+	if err != nil {
+		panic(err)
+	}
+	innerObject := jsonObject["transactionDO"].(map[string]interface{})
+	encodedData := innerObject["data"].(string)
+	bytes, err := base64.StdEncoding.DecodeString(encodedData)
+	if err != nil {
+		panic(err)
+	}
+	data := string(bytes)
+	if data != content {
+		panic(fmt.Errorf("origin isn't the same with content,origin:%+v content:%+v", data, content))
+	}
 }
 
 func TestDeposit() {
@@ -110,27 +147,31 @@ func TestDeposit() {
 		panic(fmt.Errorf("rest token:%+v is empty", restClient.RestToken))
 	}
 
+	bizid := restClient.RestClientProperties.BizId
 	u := uuid.New()
 	orderId := fmt.Sprintf("order_%v", u.String())
 	content := "我是中国人"
 	var gas int64 = 50000
-	baseResp, err := restClient.Deposit(orderId, RestBizTestAccount, content, RestBizTestKmsID, gas)
+	baseResp, err := restClient.Deposit(bizid, orderId, RestBizTestAccount, content, RestBizTestKmsID, gas)
 	if !(err == nil && baseResp.Code == "200") {
 		panic(fmt.Errorf("no succ resp baseResp:%+v err:%+v", baseResp, err))
 	}
 
+	tick := time.Tick(time.Duration(500) * time.Millisecond) // wait 2s for tx finished...
+
 	hash := baseResp.Data
-	tick := time.Tick(time.Duration(2000) * time.Millisecond) // wait 2s for tx finished...
-	select {
-	case <-tick:
-	}
-	baseResp, err = restClient.QueryReceipt(hash)
-	if !(err == nil && baseResp.Code == "200") {
-		panic(fmt.Errorf("no succ receipt baseResp:%+v err:%+v", baseResp, err))
-	}
-	baseResp, err = restClient.QueryTransaction(hash)
-	if !(err == nil && baseResp.Code == "200") {
-		panic(fmt.Errorf("no succ transaction baseResp:%+v err:%+v", baseResp, err))
+	for i := 0; i < 3; i++ {
+		select {
+		case <-tick:
+			baseResp, err = restClient.QueryReceipt(bizid, hash)
+			if !(err == nil && baseResp.Code == "200") {
+				panic(fmt.Errorf("no succ receipt baseResp:%+v err:%+v", baseResp, err))
+			}
+			baseResp, err = restClient.QueryTransaction(bizid, hash)
+			if !(err == nil && baseResp.Code == "200") {
+				panic(fmt.Errorf("no succ transaction baseResp:%+v err:%+v", baseResp, err))
+			}
+		}
 	}
 	jsonObject := make(map[string]interface{})
 	err = json.Unmarshal([]byte(baseResp.Data), &jsonObject)
@@ -155,8 +196,9 @@ func TestQueryTransaction() {
 	if err != nil {
 		panic(fmt.Errorf("failed to NewRestClient err:%+v", err))
 	}
+	bizid := restClient.RestClientProperties.BizId
 	hash := "b457afacb11dff49020f70ea1a80059b2d98466a58399d36e5b71389827216b2"
-	baseResp, err := restClient.QueryTransaction(hash)
+	baseResp, err := restClient.QueryTransaction(bizid, hash)
 	if !(err == nil && baseResp.Code == "200") {
 		panic(fmt.Errorf("no succ resp baseResp:%+v err:%+v", baseResp, err))
 	}
@@ -169,8 +211,9 @@ func TestQueryReceipt() {
 	if err != nil {
 		panic(fmt.Errorf("failed to NewRestClient err:%+v", err))
 	}
+	bizid := restClient.RestClientProperties.BizId
 	hash := "b457afacb11dff49020f70ea1a80059b2d98466a58399d36e5b71389827216b2"
-	baseResp, err := restClient.QueryReceipt(hash)
+	baseResp, err := restClient.QueryReceipt(bizid, hash)
 	if !(err == nil && baseResp.Code == "200") {
 		panic(fmt.Errorf("no succ resp baseResp:%+v err:%+v", baseResp, err))
 	}
@@ -257,11 +300,12 @@ func TestDeployContractAndCallContract() {
 	if err != nil {
 		panic(fmt.Errorf("failed to NewRestClient err:%+v", err))
 	}
+	bizid := restClient.RestClientProperties.BizId
 	u := uuid.New()
 	contractName := fmt.Sprintf("test_biz_deploy_contract_%v", u.String())
 	orderId := fmt.Sprintf("order_%v", u.String())
 	//deploy contract
-	baseResp, err := restClient.DeployContract(orderId, RestBizTestAccount, RestBizTestKmsID, contractName, "608060405234801561001057600080fd5b506040516102ef3803806102ef833981018060405281019080805190602001909291908051820192919050505081600081905550600060018190555050506102928061005d6000396000f300608060405260043610610057576000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff1680631002aecd1461005c57806338af3eed146101f0578063954ab4b21461021b575b600080fd5b34801561006857600080fd5b50610109600480360381019080803590602001908201803590602001908080601f0160208091040260200160405190810160405280939291908181526020018383808284378201915050505050509192919290803590602001908201803590602001908080601f0160208091040260200160405190810160405280939291908181526020018383808284378201915050505050509192919290505050610246565b604051808060200180602001838103835285818151815260200191508051906020019080838360005b8381101561014d578082015181840152602081019050610132565b50505050905090810190601f16801561017a5780820380516001836020036101000a031916815260200191505b50838103825284818151815260200191508051906020019080838360005b838110156101b3578082015181840152602081019050610198565b50505050905090810190601f1680156101e05780820380516001836020036101000a031916815260200191505b5094505050505060405180910390f35b3480156101fc57600080fd5b50610205610256565b6040518082815260200191505060405180910390f35b34801561022757600080fd5b5061023061025c565b6040518082815260200191505060405180910390f35b6060808383915091509250929050565b60015481565b60006001549050905600a165627a7a72305820ac9ff0ce4f83f475e39f7a8ecdfeb0b16673a328ca1af858b2ce81ccbe75837c0029")
+	baseResp, err := restClient.DeployContract(bizid, orderId, RestBizTestAccount, RestBizTestKmsID, contractName, "608060405234801561001057600080fd5b506040516102ef3803806102ef833981018060405281019080805190602001909291908051820192919050505081600081905550600060018190555050506102928061005d6000396000f300608060405260043610610057576000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff1680631002aecd1461005c57806338af3eed146101f0578063954ab4b21461021b575b600080fd5b34801561006857600080fd5b50610109600480360381019080803590602001908201803590602001908080601f0160208091040260200160405190810160405280939291908181526020018383808284378201915050505050509192919290803590602001908201803590602001908080601f0160208091040260200160405190810160405280939291908181526020018383808284378201915050505050509192919290505050610246565b604051808060200180602001838103835285818151815260200191508051906020019080838360005b8381101561014d578082015181840152602081019050610132565b50505050905090810190601f16801561017a5780820380516001836020036101000a031916815260200191505b50838103825284818151815260200191508051906020019080838360005b838110156101b3578082015181840152602081019050610198565b50505050905090810190601f1680156101e05780820380516001836020036101000a031916815260200191505b5094505050505060405180910390f35b3480156101fc57600080fd5b50610205610256565b6040518082815260200191505060405180910390f35b34801561022757600080fd5b5061023061025c565b6040518082815260200191505060405180910390f35b6060808383915091509250929050565b60015481565b60006001549050905600a165627a7a72305820ac9ff0ce4f83f475e39f7a8ecdfeb0b16673a328ca1af858b2ce81ccbe75837c0029")
 	if !(err == nil && baseResp.Code == "0") {
 		panic(fmt.Errorf("no succ resp baseResp:%+v err:%+v", baseResp, err))
 	}
@@ -280,7 +324,7 @@ func TestDeployContractAndCallContract() {
 	}
 	u = uuid.New()
 	orderId = fmt.Sprintf("order_%v", u.String())
-	baseResp, err = restClient.CallContract(orderId, RestBizTestAccount, contractName, "SayHello(bytes,string)", string(inputParamListBytes), `["bytes","string"]`, RestBizTestKmsID, false)
+	baseResp, err = restClient.CallContract(bizid, orderId, RestBizTestAccount, contractName, "SayHello(bytes,string)", string(inputParamListBytes), `["bytes","string"]`, RestBizTestKmsID, false)
 	if !(err == nil && baseResp.Success && baseResp.Code == "0") {
 		panic(fmt.Errorf("no succ resp baseResp:%+v err:%+v", baseResp, err))
 	}
@@ -306,7 +350,7 @@ func TestDeployContractAndCallContract() {
 	//local call
 	u = uuid.New()
 	orderId = fmt.Sprintf("order_%v", u.String())
-	baseResp, err = restClient.CallContract(orderId, RestBizTestAccount, contractName, "SayHello(bytes,string)", string(inputParamListBytes), `["bytes","string"]`, RestBizTestKmsID, true)
+	baseResp, err = restClient.CallContract(bizid, orderId, RestBizTestAccount, contractName, "SayHello(bytes,string)", string(inputParamListBytes), `["bytes","string"]`, RestBizTestKmsID, true)
 	if !(err == nil && baseResp.Success && baseResp.Code == "0") {
 		panic(fmt.Errorf("no succ resp baseResp:%+v err:%+v", baseResp, err))
 	}
@@ -366,16 +410,17 @@ func TestCreateAndQueryAccountWithKmsIdAndDeposit() {
 	if err != nil {
 		panic(err)
 	}
+	bizid := restClient.RestClientProperties.BizId
 	u := uuid.New()
 	orderId := fmt.Sprintf("order_%v", u.String())
 	kmsId := fmt.Sprintf("%s_%s", restClient.RestClientProperties.TenantId, u.String())
 	account := fmt.Sprintf("myaccount_%s", u.String())
-	baseResp, err := restClient.CreateAccountWithKmsId(orderId, account, kmsId)
+	baseResp, err := restClient.CreateAccountWithKmsId(bizid, orderId, account, kmsId)
 	if !(err == nil && baseResp.Success && baseResp.Code == "200") {
 		panic(fmt.Errorf("create account with kmsId failed,resp:%+v err:%+v", baseResp, err))
 	}
 
-	baseResp, err = restClient.QueryAccount(account)
+	baseResp, err = restClient.QueryAccount(bizid, account)
 	if !(err == nil && baseResp.Success && baseResp.Code == "200") {
 		panic(fmt.Errorf("query account failed,resp:%+v err:%+v", baseResp, err))
 	}
@@ -395,13 +440,13 @@ func TestCreateAndQueryAccountWithKmsIdAndDeposit() {
 	orderId = fmt.Sprintf("order_%v", u.String())
 	content := "我是中国人"
 	var gas int64 = 50000
-	baseResp, err = restClient.Deposit(orderId, account, content, kmsId, gas)
+	baseResp, err = restClient.Deposit(bizid, orderId, account, content, kmsId, gas)
 	if !(err == nil && baseResp.Code == "200") {
 		panic(fmt.Errorf("no succ deposit resp,resp:%+v err:%+v", baseResp, err))
 	}
 	hash := baseResp.Data
-	time.Sleep(2*time.Second) // wait for some time
-	baseResp, err = restClient.QueryTransaction(hash)
+	time.Sleep(2 * time.Second) // wait for some time
+	baseResp, err = restClient.QueryTransaction(bizid, hash)
 	if !(err == nil && baseResp.Code == "200") {
 		panic(fmt.Errorf("no succ transaction baseResp:%+v err:%+v", baseResp, err))
 	}
@@ -428,16 +473,17 @@ func TestCreateAndQueryAccountWithKmsIdAndDeployCallContract() {
 	if err != nil {
 		panic(err)
 	}
+	bizid := restClient.RestClientProperties.BizId
 	u := uuid.New()
 	orderId := fmt.Sprintf("order_%v", u.String())
 	kmsId := fmt.Sprintf("%s_%s", restClient.RestClientProperties.TenantId, u.String())
 	account := fmt.Sprintf("myaccount_%s", u.String())
-	baseResp, err := restClient.CreateAccountWithKmsId(orderId, account, kmsId)
+	baseResp, err := restClient.CreateAccountWithKmsId(bizid, orderId, account, kmsId)
 	if !(err == nil && baseResp.Success && baseResp.Code == "200") {
 		panic(fmt.Errorf("create account with kmsId failed,resp:%+v err:%+v", baseResp, err))
 	}
 
-	baseResp, err = restClient.QueryAccount(account)
+	baseResp, err = restClient.QueryAccount(bizid, account)
 	if !(err == nil && baseResp.Success && baseResp.Code == "200") {
 		panic(fmt.Errorf("query account failed,resp:%+v err:%+v", baseResp, err))
 	}
@@ -459,7 +505,7 @@ func TestCreateAndQueryAccountWithKmsIdAndDeployCallContract() {
 	u = uuid.New()
 	orderId = fmt.Sprintf("order_%v", u.String())
 	//deploy contract
-	baseResp, err = restClient.DeployContract(orderId, account, kmsId, contractName, "608060405234801561001057600080fd5b506040516102ef3803806102ef833981018060405281019080805190602001909291908051820192919050505081600081905550600060018190555050506102928061005d6000396000f300608060405260043610610057576000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff1680631002aecd1461005c57806338af3eed146101f0578063954ab4b21461021b575b600080fd5b34801561006857600080fd5b50610109600480360381019080803590602001908201803590602001908080601f0160208091040260200160405190810160405280939291908181526020018383808284378201915050505050509192919290803590602001908201803590602001908080601f0160208091040260200160405190810160405280939291908181526020018383808284378201915050505050509192919290505050610246565b604051808060200180602001838103835285818151815260200191508051906020019080838360005b8381101561014d578082015181840152602081019050610132565b50505050905090810190601f16801561017a5780820380516001836020036101000a031916815260200191505b50838103825284818151815260200191508051906020019080838360005b838110156101b3578082015181840152602081019050610198565b50505050905090810190601f1680156101e05780820380516001836020036101000a031916815260200191505b5094505050505060405180910390f35b3480156101fc57600080fd5b50610205610256565b6040518082815260200191505060405180910390f35b34801561022757600080fd5b5061023061025c565b6040518082815260200191505060405180910390f35b6060808383915091509250929050565b60015481565b60006001549050905600a165627a7a72305820ac9ff0ce4f83f475e39f7a8ecdfeb0b16673a328ca1af858b2ce81ccbe75837c0029")
+	baseResp, err = restClient.DeployContract(bizid, orderId, account, kmsId, contractName, "608060405234801561001057600080fd5b506040516102ef3803806102ef833981018060405281019080805190602001909291908051820192919050505081600081905550600060018190555050506102928061005d6000396000f300608060405260043610610057576000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff1680631002aecd1461005c57806338af3eed146101f0578063954ab4b21461021b575b600080fd5b34801561006857600080fd5b50610109600480360381019080803590602001908201803590602001908080601f0160208091040260200160405190810160405280939291908181526020018383808284378201915050505050509192919290803590602001908201803590602001908080601f0160208091040260200160405190810160405280939291908181526020018383808284378201915050505050509192919290505050610246565b604051808060200180602001838103835285818151815260200191508051906020019080838360005b8381101561014d578082015181840152602081019050610132565b50505050905090810190601f16801561017a5780820380516001836020036101000a031916815260200191505b50838103825284818151815260200191508051906020019080838360005b838110156101b3578082015181840152602081019050610198565b50505050905090810190601f1680156101e05780820380516001836020036101000a031916815260200191505b5094505050505060405180910390f35b3480156101fc57600080fd5b50610205610256565b6040518082815260200191505060405180910390f35b34801561022757600080fd5b5061023061025c565b6040518082815260200191505060405180910390f35b6060808383915091509250929050565b60015481565b60006001549050905600a165627a7a72305820ac9ff0ce4f83f475e39f7a8ecdfeb0b16673a328ca1af858b2ce81ccbe75837c0029")
 	if !(err == nil && baseResp.Code == "0") {
 		panic(fmt.Errorf("no succ resp baseResp:%+v err:%+v", baseResp, err))
 	}
@@ -478,7 +524,7 @@ func TestCreateAndQueryAccountWithKmsIdAndDeployCallContract() {
 	}
 	u = uuid.New()
 	orderId = fmt.Sprintf("order_%v", u.String())
-	baseResp, err = restClient.CallContract(orderId, account, contractName, "SayHello(bytes,string)", string(inputParamListBytes), `["bytes","string"]`, kmsId, false)
+	baseResp, err = restClient.CallContract(bizid, orderId, account, contractName, "SayHello(bytes,string)", string(inputParamListBytes), `["bytes","string"]`, kmsId, false)
 	if !(err == nil && baseResp.Success && baseResp.Code == "0") {
 		panic(fmt.Errorf("no succ resp baseResp:%+v err:%+v", baseResp, err))
 	}
