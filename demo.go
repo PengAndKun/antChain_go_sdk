@@ -94,7 +94,7 @@ const abiJsonStr = `[
 
 func main() {
 	TestDeposit()
-	TestDepositAsyncWithTransaction()
+	TestDepositSyncWithTransaction()
 	TestQueryTransaction()
 	TestQueryReceipt()
 	TestDeployContractAndCallContract()
@@ -102,7 +102,7 @@ func main() {
 	TestCreateAndQueryAccountWithKmsIdAndDeployCallContract()
 }
 
-func TestDepositAsyncWithTransaction() {
+func TestDepositSyncWithTransaction() {
 	configFilePath := os.Getenv("GOPATH") + "/src/gitlab.alipay-inc.com/antchain/restclient-go-demo/rest-config.json"
 	restClient, err := client.NewRestClient(configFilePath)
 	if err != nil {
@@ -116,7 +116,7 @@ func TestDepositAsyncWithTransaction() {
 	orderId := fmt.Sprintf("order_%v", u.String())
 	content := "我是中国人"
 	var gas int64 = 50000
-	baseResp, err := restClient.DepositAsyncWithTransaction(RestBizTestBizID, orderId, RestBizTestAccount, RestBizTestTenantID, content, RestBizTestKmsID, gas)
+	baseResp, err := restClient.DepositSyncWithTransaction(RestBizTestBizID, orderId, RestBizTestAccount, RestBizTestTenantID, content, RestBizTestKmsID, gas)
 	if !(err == nil && baseResp.Code == "200") {
 		panic(fmt.Errorf("no succ resp baseResp:%+v err:%+v", baseResp, err))
 	}
@@ -375,7 +375,7 @@ func TestDeployContractAndCallContract() {
 	orderId = fmt.Sprintf("order_%v", u.String())
 	orderId = fmt.Sprintf("order_%v", u.String())
 	inputParamListStr := string(inputParamListBytes)
-	resp, err := restClient.CallSolcContractAsyncWithReceipt(abi, RestBizTestBizID, orderId, RestBizTestAccount, RestBizTestTenantID, RestBizTestKmsID, contractName, "SayHello(bytes,string)", inputParamListStr, `["bytes","string"]`, sayHelloResp)
+	resp, err := restClient.CallSolcContractSyncWithReceipt(abi, RestBizTestBizID, orderId, RestBizTestAccount, RestBizTestTenantID, RestBizTestKmsID, contractName, "SayHello(bytes,string)", inputParamListStr, `["bytes","string"]`, sayHelloResp)
 	if !(err == nil && resp.Success && resp.Code == "200") {
 		panic(fmt.Errorf("callSolcContractAsyncWithReceipt failed resp:%+v err:%+v", resp, err))
 	}
