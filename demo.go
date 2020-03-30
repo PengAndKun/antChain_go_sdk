@@ -92,6 +92,20 @@ const abiJsonStr = `[
   }
 ]`
 
+var restClient *client.RestClient
+
+func init() {
+	var err error
+	configFilePath := os.Getenv("GOPATH") + "/src/gitlab.alipay-inc.com/antchain/restclient-go-demo/rest-config.json"
+	restClient, err = client.NewRestClient(configFilePath)
+	if err != nil {
+		panic(fmt.Errorf("failed to NewRestClient err:%+v", err))
+	}
+	if restClient.RestToken == "" {
+		panic(fmt.Errorf("rest token:%+v is empty", restClient.RestToken))
+	}
+}
+
 func main() {
 	TestDeposit()
 	TestDepositSyncWithTransaction()
@@ -103,15 +117,6 @@ func main() {
 }
 
 func TestDepositSyncWithTransaction() {
-	configFilePath := os.Getenv("GOPATH") + "/src/gitlab.alipay-inc.com/antchain/restclient-go-demo/rest-config.json"
-	restClient, err := client.NewRestClient(configFilePath)
-	if err != nil {
-		panic(fmt.Errorf("failed to NewRestClient err:%+v", err))
-	}
-	if restClient.RestToken == "" {
-		panic(fmt.Errorf("rest token:%+v is empty", restClient.RestToken))
-	}
-
 	u := uuid.New()
 	orderId := fmt.Sprintf("order_%v", u.String())
 	content := "我是中国人"
@@ -138,15 +143,6 @@ func TestDepositSyncWithTransaction() {
 }
 
 func TestDeposit() {
-	configFilePath := os.Getenv("GOPATH") + "/src/gitlab.alipay-inc.com/antchain/restclient-go-demo/rest-config.json"
-	restClient, err := client.NewRestClient(configFilePath)
-	if err != nil {
-		panic(fmt.Errorf("failed to NewRestClient err:%+v", err))
-	}
-	if restClient.RestToken == "" {
-		panic(fmt.Errorf("rest token:%+v is empty", restClient.RestToken))
-	}
-
 	u := uuid.New()
 	orderId := fmt.Sprintf("order_%v", u.String())
 	content := "我是中国人"
@@ -190,11 +186,6 @@ func TestDeposit() {
 }
 
 func TestQueryTransaction() {
-	configFilePath := os.Getenv("GOPATH") + "/src/gitlab.alipay-inc.com/antchain/restclient-go-sdk/test/rest-config.json"
-	restClient, err := client.NewRestClient(configFilePath)
-	if err != nil {
-		panic(fmt.Errorf("failed to NewRestClient err:%+v", err))
-	}
 	hash := "b457afacb11dff49020f70ea1a80059b2d98466a58399d36e5b71389827216b2"
 	baseResp, err := restClient.QueryTransaction(RestBizTestBizID, hash)
 	if !(err == nil && baseResp.Code == "200") {
@@ -204,11 +195,6 @@ func TestQueryTransaction() {
 }
 
 func TestQueryReceipt() {
-	configFilePath := os.Getenv("GOPATH") + "/src/gitlab.alipay-inc.com/antchain/restclient-go-sdk/test/rest-config.json"
-	restClient, err := client.NewRestClient(configFilePath)
-	if err != nil {
-		panic(fmt.Errorf("failed to NewRestClient err:%+v", err))
-	}
 	hash := "b457afacb11dff49020f70ea1a80059b2d98466a58399d36e5b71389827216b2"
 	baseResp, err := restClient.QueryReceipt(RestBizTestBizID, hash)
 	if !(err == nil && baseResp.Code == "200") {
@@ -292,11 +278,6 @@ func TestQueryReceipt() {
 ]
 */
 func TestDeployContractAndCallContract() {
-	configFilePath := os.Getenv("GOPATH") + "/src/gitlab.alipay-inc.com/antchain/restclient-go-sdk/test/rest-config.json"
-	restClient, err := client.NewRestClient(configFilePath)
-	if err != nil {
-		panic(fmt.Errorf("failed to NewRestClient err:%+v", err))
-	}
 	u := uuid.New()
 	contractName := fmt.Sprintf("test_biz_deploy_contract_%v", u.String())
 	orderId := fmt.Sprintf("order_%v", u.String())
@@ -390,11 +371,6 @@ func TestDeployContractAndCallContract() {
 }
 
 func TestCreateAndQueryAccountWithKmsIdAndDeposit() {
-	configFilePath := os.Getenv("GOPATH") + "/src/gitlab.alipay-inc.com/antchain/restclient-go-sdk/test/rest-config.json"
-	restClient, err := client.NewRestClient(configFilePath)
-	if err != nil {
-		panic(err)
-	}
 	u := uuid.New()
 	orderId := fmt.Sprintf("order_%v", u.String())
 	kmsId := fmt.Sprintf("%s_%s", RestBizTestTenantID, u.String())
@@ -452,11 +428,6 @@ func TestCreateAndQueryAccountWithKmsIdAndDeposit() {
 }
 
 func TestCreateAndQueryAccountWithKmsIdAndDeployCallContract() {
-	configFilePath := os.Getenv("GOPATH") + "/src/gitlab.alipay-inc.com/antchain/restclient-go-sdk/test/rest-config.json"
-	restClient, err := client.NewRestClient(configFilePath)
-	if err != nil {
-		panic(err)
-	}
 	u := uuid.New()
 	orderId := fmt.Sprintf("order_%v", u.String())
 	kmsId := fmt.Sprintf("%s_%s", RestBizTestTenantID, u.String())
