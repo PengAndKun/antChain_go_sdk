@@ -6,9 +6,7 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"gitlab.alipay-inc.com/antchain/restclient-go-sdk/client"
-	"gitlab.alipay-inc.com/antchain/restclient-go-sdk/mychain/mychain-sdk-go/common/codec/contract/abi"
 	"os"
-	"strings"
 	"time"
 )
 
@@ -341,28 +339,6 @@ func TestDeployContractAndCallContract() {
 		panic(err)
 	}
 	output2 = outputs.OutRes[1].(string)
-	if !isBytesSame(arg1, output1) {
-		panic(fmt.Errorf("intput arg1:%+v is not same with output1:%+v", arg1, output1))
-	}
-	if arg2 != output2 {
-		panic(fmt.Errorf("input arg2:%s is not same with output2:%s", arg2, output2))
-	}
-	//async call and query receipts
-	abi, err := abi.JSON(strings.NewReader(abiJsonStr))
-	if err != nil {
-		panic(err)
-	}
-	sayHelloResp := &[]interface{}{&[]byte{}, new(string)}
-	u = uuid.New()
-	orderId = fmt.Sprintf("order_%v", u.String())
-	orderId = fmt.Sprintf("order_%v", u.String())
-	inputParamListStr := string(inputParamListBytes)
-	resp, err := restClient.CallSolcContractSyncWithReceipt(abi, RestBizTestBizID, orderId, RestBizTestAccount, RestBizTestTenantID, RestBizTestKmsID, contractName, "SayHello(bytes,string)", inputParamListStr, `["bytes","string"]`, gas, sayHelloResp)
-	if !(err == nil && resp.Success && resp.Code == "200") {
-		panic(fmt.Errorf("callSolcContractAsyncWithReceipt failed resp:%+v err:%+v", resp, err))
-	}
-	output1 = *(*sayHelloResp)[0].(*[]byte)
-	output2 = *(*sayHelloResp)[1].(*string)
 	if !isBytesSame(arg1, output1) {
 		panic(fmt.Errorf("intput arg1:%+v is not same with output1:%+v", arg1, output1))
 	}
