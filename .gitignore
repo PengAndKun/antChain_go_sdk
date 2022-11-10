@@ -9,3 +9,7 @@ vendor
 demo
 # build
 dist
+
+rest-config.json
+access.key
+env.json
