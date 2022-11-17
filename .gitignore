@@ -7,9 +7,9 @@ yarn-debug.log*
 yarn-error.log*
 vendor
 demo
-# build
-dist
-
 rest-config.json
 access.key
 env.json
+# build
+dist
+

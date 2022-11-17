@@ -71,7 +71,7 @@ func init() {
 	RestBizBizID = envjson.RestBizBizID
 	RestBizAccount = envjson.RestBizAccount
 	RestBizKmsID = envjson.RestBizKmsID
-	RestBizTenantID = RestBizTenantID
+	RestBizTenantID = envjson.RestBizTenantID
 
 	ERC20 = envjson.ERC20
 	ERC721 = envjson.ERC721
@@ -99,4 +99,8 @@ func InputParamIdentityFromIdentity(name string) interface{} {
 	_identity_string := base64.StdEncoding.EncodeToString(_identity[:])
 	identity := Identity{_identity_string, false, _identity_string}
 	return identity
+}
+func IsName(str string) bool {
+	cmp := strings.Compare("0x", str[:2]) //比较开头是否是地址还是name
+	return cmp != 0
 }

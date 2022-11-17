@@ -1,0 +1,46 @@
+package request
+
+func CallContractNFTShop(r *gin.Engine) {
+	//上架藏品
+	r.POST("/callContract/ERC721/balanceOf", func(c *gin.Context) {
+		defer func() {
+			if err := recover(); err != nil {
+				log.Println("catch exception")
+				c.JSON(http.StatusOK, gin.H{
+					"result": err,
+				})
+			}
+		}()
+		buf := make([]byte, 1024)
+		c.Request.Body.Read(buf)
+		BalanceOfData := ContractERC721BalanceOf{}
+		jsoniter.Unmarshal(buf, &BalanceOfData)
+
+		var gas int64 = 50000
+		jsonArr := make([]interface{}, 0)
+		jsonArr = append(jsonArr, InputParamIdentity(BalanceOfData.Account)) //balanceOf(identity)
+		//inputParamListBytes, err := json.Marshal(&jsonArr)
+
+		inputParamListBytes, err := json.Marshal(&jsonArr)
+		if err != nil {
+			log.Panicln(err)
+		}
+		u := uuid.New()
+		orderId := fmt.Sprintf("order_%v", u.String())
+		erc721Identity := BalanceOfData.ERC721Identity
+		if BalanceOfData.ERC721Identity == "" {
+			erc721Identity = ERC721
+		}
+		baseResp, err := RestClient.CallContract(RestBizBizID,
+			orderId, RestBizAccount, RestBizTenantID,
+			erc721Identity, "balanceOf(identity)",
+			string(inputParamListBytes), `["uint256"]`,
+			RestBizKmsID, false, gas)
+		if !(err == nil && baseResp.Success && baseResp.Code == "200") {
+			panic(fmt.Errorf("no succ resp baseResp:%+v err:%+v", baseResp, err))
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"result": baseResp,
+		})
+	})
+}

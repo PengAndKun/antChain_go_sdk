@@ -37,6 +37,7 @@ func Service() {
 	r.Use(GinRecovery(true))
 	request.Query(r)
 	request.CallContractERC20(r)
+	request.CallContractERC721(r)
 	r.Run(getPort())
 }
 
